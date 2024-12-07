@@ -1,32 +1,108 @@
 import os
 import subprocess
 import itertools
+import distro
+import sys
 
+# check for distro module and install if not detected.
+try:
+    import distro
+except ImportError:
+    print("The 'distro' module is not installed. Installing it now...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "distro"])
+    import distro  # Try importing it again after installation
+    
+def detect_distro():
+    """Detect the Linux distribution and return the name."""
+    # Use distro package to get the distribution name
+    distro_name = distro.id().lower()
+    
+    if distro_name in ["debian", "ubuntu"]:
+        return "debian/ubuntu"
+    elif distro_name == "fedora":
+        return "fedora"
+    elif distro_name == "arch":
+        return "arch"
+    else:
+        return None  # Unknown distro
 
 def install_dependencies():
-    """Install Pipal dependencies and optionally install CeWL for Arch Linux."""
-    print("Checking for first-run setup...")
-    setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
-    if setup_pipal in {'yes', 'y'}:
-        pipal_repo = "https://github.com/digininja/pipal.git"
-        pipal_dir = "./pipal"
+    """Install Pipal dependencies and optionally install CeWL for different Linux distros."""
+    distro = detect_distro()
+    print(f"Detected distribution: {distro}")
+    
+    if distro == "arch":
+        print("Checking for first-run setup on Arch Linux...")
+        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
+        if setup_pipal in {'yes', 'y'}:
+            pipal_repo = "https://github.com/digininja/pipal.git"
+            pipal_dir = "./pipal"
 
-        if not os.path.exists(pipal_dir):
-            print(f"Cloning Pipal repository from {pipal_repo}...")
-            subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
-        else:
-            print("Pipal directory already exists. Skipping cloning.")
+            if not os.path.exists(pipal_dir):
+                print(f"Cloning Pipal repository from {pipal_repo}...")
+                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
+            else:
+                print("Pipal directory already exists. Skipping cloning.")
 
-        print("Ensuring Ruby is installed...")
-        subprocess.run("sudo pacman -S --noconfirm ruby", shell=True)
-        print("Ruby installed.")
+            print("Ensuring Ruby is installed...")
+            subprocess.run("sudo pacman -S --noconfirm ruby", shell=True)
+            print("Ruby installed.")
 
-    install_cewl = input("Do you want to install CeWL? (yes/no): ").strip().lower()
-    if install_cewl in {'yes', 'y'}:
-        print("Installing CeWL using Arch Linux's package manager...")
-        subprocess.run("sudo pacman -S --needed --noconfirm cewl", shell=True)
-        print("CeWL installed.")
+        install_cewl = input("Do you want to install/update CeWL? (yes/no): ").strip().lower()
+        if install_cewl in {'yes', 'y'}:
+            print("Installing CeWL using Arch Linux's package manager...")
+            subprocess.run("sudo pacman -S --needed --noconfirm cewl", shell=True)
+            print("CeWL installed.")
+    
+    elif distro == "debian/ubuntu":
+        print("Checking for first-run setup on Debian/Ubuntu...")
+        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
+        if setup_pipal in {'yes', 'y'}:
+            pipal_repo = "https://github.com/digininja/pipal.git"
+            pipal_dir = "./pipal"
 
+            if not os.path.exists(pipal_dir):
+                print(f"Cloning Pipal repository from {pipal_repo}...")
+                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
+            else:
+                print("Pipal directory already exists. Skipping cloning.")
+
+            print("Ensuring Ruby is installed...")
+            subprocess.run("sudo apt-get install -y ruby", shell=True)
+            print("Ruby installed.")
+
+        install_cewl = input("Do you want to install CeWL? (yes/no): ").strip().lower()
+        if install_cewl in {'yes', 'y'}:
+            print("Installing CeWL using Debian/Ubuntu's package manager...")
+            subprocess.run("sudo apt-get install -y cewl", shell=True)
+            print("CeWL installed.")
+    
+    elif distro == "fedora":
+        print("Checking for first-run setup on Fedora...")
+        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
+        if setup_pipal in {'yes', 'y'}:
+            pipal_repo = "https://github.com/digininja/pipal.git"
+            pipal_dir = "./pipal"
+
+            if not os.path.exists(pipal_dir):
+                print(f"Cloning Pipal repository from {pipal_repo}...")
+                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
+            else:
+                print("Pipal directory already exists. Skipping cloning.")
+
+            print("Ensuring Ruby is installed...")
+            subprocess.run("sudo dnf install -y ruby", shell=True)
+            print("Ruby installed.")
+
+        install_cewl = input("Do you want to install CeWL? (yes/no): ").strip().lower()
+        if install_cewl in {'yes', 'y'}:
+            print("Installing CeWL using Fedora's package manager...")
+            subprocess.run("sudo dnf install -y cewl", shell=True)
+            print("CeWL installed.")
+    
+    else:
+        print("Unknown distribution. Unable to install dependencies automatically.")
+        return
 
 def read_patterns(pattern_file):
     """Read patterns from the given file and return as a list."""
