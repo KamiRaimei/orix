@@ -1,6 +1,6 @@
 # Orix
 
-A powerful wordlist generation tool for pentesting, combining **CeWL**, **Pipal**, and **SecLists**. Orix provides a robust and efficient pipeline for collecting, analyzing, and generating highly customized wordlists from multiple sources such as websites, password patterns, and more.
+A simple wordlist generation tool for pentesting, combining **CeWL**, **Pipal**, and **SecLists**. Orix provides a robust and efficient pipeline for collecting, analyzing, and generating highly customized wordlists from multiple sources such as websites, password patterns, and more.
 
 **Note**: This project is created for **educational and experimental purposes** only. Please use it responsibly and ensure you have proper authorization before using it in any pentesting scenarios.
 
@@ -60,7 +60,6 @@ A powerful wordlist generation tool for pentesting, combining **CeWL**, **Pipal*
 2. Run the script:
 
     ```bash
-    Copy code
     python3 orix.py
     ```
 3. The script will:
