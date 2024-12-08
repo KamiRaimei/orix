@@ -1,6 +1,6 @@
 # Orix
 
-A simple wordlist generation tool for pentesting, combining **CeWL**, **Pipal**, and **SecLists**. Orix provides a robust and efficient pipeline for collecting, analyzing, and generating highly customized wordlists from multiple sources such as websites, password patterns, and more.
+A simple wordlist generation tool for pentesting, combining **CeWL**, **Pipal**, and **SecLists**. Orix provides a simple pipeline for collecting, analyzing, and generating highly customized wordlists from multiple sources such as websites, password patterns, and more.
 
 **Note**: This project is created for **educational and experimental purposes** only. Please use it responsibly and ensure you have proper authorization before using it in any pentesting scenarios.
 
@@ -10,7 +10,7 @@ A simple wordlist generation tool for pentesting, combining **CeWL**, **Pipal**,
 
 - **Dependency Auto-Installation**:
   - Automatically detects your Linux distribution (Arch, Debian/Ubuntu, Fedora).
-  - Installs necessary dependencies like **CeWL**, **Ruby**, and **Pipal** (best effort).
+  - Installs necessary dependencies like **CeWL**, **Ruby**, and **Pipal** (attempt best effort).
 
 - **CeWL Integration**:
   - Crawl websites to generate wordlists.
@@ -42,10 +42,11 @@ A simple wordlist generation tool for pentesting, combining **CeWL**, **Pipal**,
 ## Requirements
 
 - Python 3.x
-- Supported Linux distributions:
-  - **Arch Linux**: Full automation for dependency installation.
-  - **Debian/Ubuntu**: Supports automated setup via `apt`.
-  - **Fedora**: Supports automated setup via `dnf`.
+- Git
+- Supported Linux distributions for automatic dependencies download:
+  - **Arch Linux**
+  - **Debian/Ubuntu**
+  - **Fedora**
   - Other distributions may require manual setup.
 
 ---
