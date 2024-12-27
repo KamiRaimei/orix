@@ -1,22 +1,51 @@
 import os
 import subprocess
-import itertools
-import distro
 import sys
+import logging
+from typing import List, Generator, Optional
 
-# check for distro module and install if not detected.
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Constants
+PIPAL_REPO = "https://github.com/digininja/pipal.git"
+PIPAL_DIR = "./pipal"
+SECLISTS_LOCAL_DIR = "/usr/share/wordlists/seclists/Passwords/"
+
+# Check for distro module and install if not detected
 try:
     import distro
 except ImportError:
-    print("The 'distro' module is not installed. Installing it now...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "distro"])
-    import distro  # Try importing it again after installation
-    
-def detect_distro():
+    logging.info("The 'distro' module is not installed. Installing it now...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "distro"], check=True)
+    import distro
+
+
+def run_command(command: List[str]) -> None:
+    """Run a shell command and handle errors."""
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error executing command: {' '.join(command)}\n{e}")
+        sys.exit(1)
+
+
+def install_package(package_manager: str, package_name: str) -> None:
+    """Install a package using the specified package manager."""
+    if package_manager == "pacman":
+        run_command(["sudo", "pacman", "-S", "--noconfirm", package_name])
+    elif package_manager == "apt-get":
+        run_command(["sudo", "apt-get", "install", "-y", package_name])
+    elif package_manager == "dnf":
+        run_command(["sudo", "dnf", "install", "-y", package_name])
+    else:
+        logging.error(f"Unsupported package manager: {package_manager}")
+        sys.exit(1)
+
+
+def detect_distro() -> str:
     """Detect the Linux distribution and return the name."""
-    # Use distro package to get the distribution name
     distro_name = distro.id().lower()
-    
     if distro_name in ["debian", "ubuntu"]:
         return "debian/ubuntu"
     elif distro_name == "fedora":
@@ -24,102 +53,78 @@ def detect_distro():
     elif distro_name == "arch":
         return "arch"
     else:
-        return None  # Unknown distro
+        return "unknown"
 
-def install_dependencies():
-    """Install Pipal dependencies and optionally install CeWL for different Linux distros."""
-    distro = detect_distro()
-    print(f"Detected distribution: {distro}")
-    
-    if distro == "arch":
-        print("Checking for first-run setup on Arch Linux...")
-        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
-        if setup_pipal in {'yes', 'y'}:
-            pipal_repo = "https://github.com/digininja/pipal.git"
-            pipal_dir = "./pipal"
 
-            if not os.path.exists(pipal_dir):
-                print(f"Cloning Pipal repository from {pipal_repo}...")
-                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
-            else:
-                print("Pipal directory already exists. Skipping cloning.")
-
-            print("Ensuring Ruby is installed...")
-            subprocess.run("sudo pacman -S --noconfirm ruby", shell=True)
-            print("Ruby installed.")
-
-        install_cewl = input("Do you want to install/update CeWL? (yes/no): ").strip().lower()
-        if install_cewl in {'yes', 'y'}:
-            print("Installing CeWL using Arch Linux's package manager...")
-            subprocess.run("sudo pacman -S --needed --noconfirm cewl", shell=True)
-            print("CeWL installed.")
-    
-    elif distro == "debian/ubuntu":
-        print("Checking for first-run setup on Debian/Ubuntu...")
-        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
-        if setup_pipal in {'yes', 'y'}:
-            pipal_repo = "https://github.com/digininja/pipal.git"
-            pipal_dir = "./pipal"
-
-            if not os.path.exists(pipal_dir):
-                print(f"Cloning Pipal repository from {pipal_repo}...")
-                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
-            else:
-                print("Pipal directory already exists. Skipping cloning.")
-
-            print("Ensuring Ruby is installed...")
-            subprocess.run("sudo apt-get install -y ruby", shell=True)
-            print("Ruby installed.")
-
-        install_cewl = input("Do you want to install CeWL? (yes/no): ").strip().lower()
-        if install_cewl in {'yes', 'y'}:
-            print("Installing CeWL using Debian/Ubuntu's package manager...")
-            subprocess.run("sudo apt-get install -y cewl", shell=True)
-            print("CeWL installed.")
-    
-    elif distro == "fedora":
-        print("Checking for first-run setup on Fedora...")
-        setup_pipal = input("Do you want to download and setup Pipal dependencies? (yes/no): ").strip().lower()
-        if setup_pipal in {'yes', 'y'}:
-            pipal_repo = "https://github.com/digininja/pipal.git"
-            pipal_dir = "./pipal"
-
-            if not os.path.exists(pipal_dir):
-                print(f"Cloning Pipal repository from {pipal_repo}...")
-                subprocess.run(f"git clone {pipal_repo} {pipal_dir}", shell=True)
-            else:
-                print("Pipal directory already exists. Skipping cloning.")
-
-            print("Ensuring Ruby is installed...")
-            subprocess.run("sudo dnf install -y ruby", shell=True)
-            print("Ruby installed.")
-
-        install_cewl = input("Do you want to install CeWL? (yes/no): ").strip().lower()
-        if install_cewl in {'yes', 'y'}:
-            print("Installing CeWL using Fedora's package manager...")
-            subprocess.run("sudo dnf install -y cewl", shell=True)
-            print("CeWL installed.")
-    
+def setup_pipal(distro_name: str) -> None:
+    """Setup Pipal repository and install Ruby."""
+    if not os.path.exists(PIPAL_DIR):
+        logging.info(f"Cloning Pipal repository from {PIPAL_REPO}...")
+        run_command(["git", "clone", PIPAL_REPO, PIPAL_DIR])
     else:
-        print("Unknown distribution. Unable to install dependencies automatically.")
+        logging.info("Pipal directory already exists. Skipping cloning.")
+
+    logging.info("Ensuring Ruby is installed...")
+    if distro_name == "arch":
+        install_package("pacman", "ruby")
+    elif distro_name == "debian/ubuntu":
+        install_package("apt-get", "ruby")
+    elif distro_name == "fedora":
+        install_package("dnf", "ruby")
+    logging.info("Ruby installed.")
+
+
+def install_dependencies() -> None:
+    """Install Pipal dependencies and optionally install CeWL for different Linux distros."""
+    distro_name = detect_distro()
+    logging.info(f"Detected distribution: {distro_name}")
+
+    if distro_name not in ["arch", "debian/ubuntu", "fedora"]:
+        logging.error("Unknown distribution. Unable to install dependencies automatically.")
         return
 
-def read_patterns(pattern_file):
-    """Read patterns from the given file and return as a list."""
+    setup_pipal_input = get_yes_no_input("Do you want to download and setup Pipal dependencies? (yes/no): ")
+    if setup_pipal_input:
+        setup_pipal(distro_name)
+
+    install_cewl_input = get_yes_no_input("Do you want to install/update CeWL? (yes/no): ")
+    if install_cewl_input:
+        if distro_name == "arch":
+            install_package("pacman", "cewl")
+        elif distro_name == "debian/ubuntu":
+            install_package("apt-get", "cewl")
+        elif distro_name == "fedora":
+            install_package("dnf", "cewl")
+        logging.info("CeWL installed.")
+
+
+def get_yes_no_input(prompt: str) -> bool:
+    """Get a yes/no input from the user."""
+    while True:
+        response = input(prompt).strip().lower()
+        if response in {'yes', 'y'}:
+            return True
+        elif response in {'no', 'n'}:
+            return False
+        logging.warning("Invalid input. Please enter 'yes' or 'no'.")
+
+
+def read_patterns(pattern_file: str) -> Generator[str, None, None]:
+    """Read patterns from the given file and return as a generator."""
     try:
         with open(pattern_file, 'r') as f:
-            patterns = [line.strip() for line in f if line.strip()]
-            print(f"Found {len(patterns)} patterns in {pattern_file}.")
-            return patterns
+            for line in f:
+                if line.strip():
+                    yield line.strip()
     except FileNotFoundError:
-        print(f"Error: The file {pattern_file} does not exist.")
-        exit()
+        logging.error(f"Error: The file {pattern_file} does not exist.")
+        sys.exit(1)
     except Exception as e:
-        print(f"An error occurred while reading {pattern_file}: {e}")
-        exit()
+        logging.error(f"An error occurred while reading {pattern_file}: {e}")
+        sys.exit(1)
 
 
-def leet_speak_variants(word):
+def leet_speak_variants(word: str) -> set:
     """Generate leet speak variants for a given word."""
     replacements = {'a': '@', 'e': '3', 'i': '1', 'o': '0', 's': '$'}
     variants = {word}
@@ -129,7 +134,7 @@ def leet_speak_variants(word):
     return variants
 
 
-def generate_password_variants(words, patterns):
+def generate_password_variants(words: List[str], patterns: List[str]) -> List[str]:
     """Generate password-like variants for each word using the patterns."""
     variants = set(words)
     years = ['2023', '2024']
@@ -137,20 +142,13 @@ def generate_password_variants(words, patterns):
     number_sequences = ['123', '1234', '12345']
 
     for word in words:
-        # Add leet speak variants
         variants.update(leet_speak_variants(word))
-
-        # Add common combinations
         for pattern in patterns:
             variants.add(word + pattern)
             variants.add(pattern + word)
-
-        # Add years, special characters, and number sequences
         for item in years + special_chars + number_sequences:
             variants.add(word + item)
             variants.add(item + word)
-
-        # Add duplication, reversal, and camel case
         variants.add(word + word)  # Duplicated word
         variants.add(word[::-1])  # Full reverse
         if len(word) > 1:
@@ -164,154 +162,143 @@ def generate_password_variants(words, patterns):
     return list(variants)
 
 
-def cewl_crawl():
+def cewl_crawl() -> Optional[str]:
     """Prompt user for CeWL options and perform web crawling."""
-    use_cewl = input("Would you like to use CeWL to crawl a website for passwords? (yes/no): ").strip().lower()
-    if use_cewl in {'yes', 'y'}:
-        url = input("Enter the URL to crawl: ").strip()
-        depth = input("Enter crawl depth (default is 2): ").strip() or "2"
-        offsite = input("Enable offsite following for CeWL? (yes/no): ").strip().lower()
-        offsite_flag = "-o" if offsite in {'yes', 'y'} else ""
-        output_file = input("Enter the output file name for CeWL words (including extension): ").strip()
-        verbose = input("Enable verbose mode for CeWL? (yes/no): ").strip().lower()
-        verbosity_flag = "-v" if verbose in {'yes', 'y'} else ""
+    use_cewl = get_yes_no_input("Would you like to use CeWL to crawl a website for passwords? (yes/no): ")
+    if not use_cewl:
+        return None
 
-        command = f"cewl -d {depth} {offsite_flag} {verbosity_flag} -w {output_file} {url}"
-        print(f"Running CeWL with command: {command}")
-        subprocess.run(command, shell=True)
-        print(f"CeWL output saved to: {output_file}")
-        return output_file
-    return None
+    url = input("Enter the URL to crawl: ").strip()
+    depth = input("Enter crawl depth (default is 2): ").strip() or "2"
+    offsite = get_yes_no_input("Enable offsite following for CeWL? (yes/no): ")
+    offsite_flag = "-o" if offsite else ""
+    output_file = input("Enter the output file name for CeWL words (including extension): ").strip()
+    verbose = get_yes_no_input("Enable verbose mode for CeWL? (yes/no): ")
+    verbosity_flag = "-v" if verbose else ""
+
+    command = f"cewl -d {depth} {offsite_flag} {verbosity_flag} -w {output_file} {url}"
+    logging.info(f"Running CeWL with command: {command}")
+    run_command(command.split())
+    logging.info(f"CeWL output saved to: {output_file}")
+    return output_file
 
 
-def run_pipal(input_file):
+def run_pipal(input_file: str) -> List[str]:
     """Run Pipal on the input file and generate the top 10 base words and passwords."""
-    pipal_repo = "./pipal"
     output_file = "pipal_output.txt"
+    logging.info(f"Running Pipal on {input_file}...")
+    run_command(["ruby", f"{PIPAL_DIR}/pipal.rb", input_file, "--output", output_file])
 
-    # Run Pipal on the given file and generate the output
-    print(f"Running Pipal on {input_file}...")
-    result = subprocess.run(f"ruby {pipal_repo}/pipal.rb {input_file} --output {output_file}", shell=True, capture_output=True)
-
-    # Check if Pipal ran successfully and generated output
-    if result.returncode != 0:
-        print(f"Error running Pipal. Output:\n{result.stderr.decode()}")
-        return []
-
-    # Verify that the output file was created
     if not os.path.exists(output_file):
-        print(f"Error: Pipal did not generate the expected output file: {output_file}")
+        logging.error(f"Error: Pipal did not generate the expected output file: {output_file}")
         return []
 
-    # Process the Pipal output to extract the top 10 passwords
     command = f"grep -A 10 'Top 10 passwords' {output_file} | tail -n +2 | awk -F '=' '{{print $1}}' | tr 'A-Z' 'a-z'"
     try:
         result = subprocess.check_output(command, shell=True, text=True)
-        # Split the result into a list of passwords (strip any extra spaces or newlines)
         top_passwords = [password.strip() for password in result.splitlines() if password.strip()]
-        print(f"Top 10 passwords from Pipal: {top_passwords}")
+        logging.info(f"Top 10 passwords from Pipal: {top_passwords}")
         return top_passwords
     except subprocess.CalledProcessError as e:
-        print(f"Error processing Pipal output: {e}")
+        logging.error(f"Error processing Pipal output: {e}")
         return []
 
-def seclists_source():
+
+def seclists_source() -> Optional[str]:
     """Prompt user to choose between local SecLists, remote repository, or skip SecLists."""
-    print("Choose SecLists source or skip:")
-    print("1. Use locally installed SecLists (/usr/share/wordlists/seclists/Passwords/)")
-    print("2. Clone specific directories or files from the SecLists GitHub repository")
-    print("3. Skip SecLists")
+    logging.info("Choose SecLists source or skip:")
+    logging.info("1. Use locally installed SecLists (/usr/share/wordlists/seclists/Passwords/)")
+    logging.info("2. Clone specific directories or files from the SecLists GitHub repository")
+    logging.info("3. Skip SecLists")
     choice = input("Enter your choice (1/2/3): ").strip()
 
     if choice == "1":
-        local_dir = "/usr/share/wordlists/seclists/Passwords/"
-        if os.path.exists(local_dir):
-            print(f"Scanning available files and directories in: {local_dir}")
+        if os.path.exists(SECLISTS_LOCAL_DIR):
             files = []
-            for root, dirs, filenames in os.walk(local_dir):
+            for root, _, filenames in os.walk(SECLISTS_LOCAL_DIR):
                 for filename in filenames:
                     files.append(os.path.join(root, filename))
             for idx, filepath in enumerate(files, 1):
-                print(f"{idx}. {filepath}")
+                logging.info(f"{idx}. {filepath}")
 
             selection = input("Enter the number corresponding to the file you want to use: ").strip()
             try:
                 selected_file = files[int(selection) - 1]
-                print(f"Selected file: {selected_file}")
+                logging.info(f"Selected file: {selected_file}")
                 return selected_file
             except (IndexError, ValueError):
-                print("Invalid selection. Please try again.")
+                logging.error("Invalid selection. Please try again.")
                 return seclists_source()
         else:
-            print(f"Local SecLists directory not found at {local_dir}.")
+            logging.error(f"Local SecLists directory not found at {SECLISTS_LOCAL_DIR}.")
             return None
 
     elif choice == "2":
-        return selective_seclists_clone()
+        logging.warning("Selective cloning from SecLists GitHub repository is not implemented yet.")
+        return None
 
     elif choice == "3":
-        print("Skipping SecLists.")
+        logging.info("Skipping SecLists.")
         return None
 
     else:
-        print("Invalid choice. Please try again.")
+        logging.error("Invalid choice. Please try again.")
         return seclists_source()
 
-def main():
-    """Main script logic."""
-    # Install dependencies (Pipal, CeWL)
-    install_dependencies()
 
-    # Crawl website with CeWL
-    cewl_file = cewl_crawl()
-
-    # Choose and load SecLists file (optional)
-    seclists_file = seclists_source()
-
-    # Get Pipal top 10 passwords
-    pipal_passwords = run_pipal(cewl_file if cewl_file else seclists_file)  # Assuming we use CeWL file if available
-
-    # Prompt user for additional base words
-    additional_base_words_input = input("Enter additional base words, separated by commas: ").strip()
-    additional_base_words = [word.strip().lower() for word in additional_base_words_input.split(",") if word.strip()]
-
-    # Read user-provided pattern file
-    pattern_file = input("Enter the name of the pattern file (or press Enter to skip): ").strip()
-    patterns = read_patterns(pattern_file) if pattern_file else []
-
-    # Collect words from all sources
+def collect_words_from_sources(cewl_file: Optional[str], seclists_file: Optional[str], pipal_passwords: List[str]) -> List[str]:
+    """Collect words from CeWL, SecLists, and Pipal."""
     words = []
     if cewl_file:
         with open(cewl_file, 'r') as f:
-            words.extend([line.strip() for line in f if line.strip()])
+            words.extend(line.strip() for line in f if line.strip())
     if seclists_file:
         with open(seclists_file, 'r') as f:
-            words.extend([line.strip() for line in f if line.strip()])
+            words.extend(line.strip() for line in f if line.strip())
     if pipal_passwords:
         words.extend(pipal_passwords)
-    if additional_base_words:
-        words.extend(additional_base_words)
+    return words
 
-    # Generate password variants
+
+def generate_and_save_variants(words: List[str], patterns: List[str], output_file: str) -> None:
+    """Generate password variants and save them to a file."""
     variants = generate_password_variants(words, patterns)
+    with open(output_file, 'w') as f:
+        for variant in variants:
+            f.write(variant + '\n')
+    logging.info(f"Generated {len(variants)} password combinations. Saved to {output_file}.")
 
-    # Display a summary of input files used
-    print("\nSummary of files used for word combination:")
-    print(f"CeWL file used: {cewl_file if cewl_file else 'None'}")
-    print(f"SecLists file used: {seclists_file if seclists_file else 'None'}")
-    print(f"Pipal top 10 passwords: {', '.join(pipal_passwords) if pipal_passwords else 'None'}")
-    print(f"Additional base words: {', '.join(additional_base_words) if additional_base_words else 'None'}")
 
-    proceed = input("Do you want to proceed with generating password combinations? (yes/no): ").strip().lower()
-    if proceed in {'yes', 'y'}:
+def main() -> None:
+    """Main script logic."""
+    install_dependencies()
+
+    cewl_file = cewl_crawl()
+    seclists_file = seclists_source()
+    pipal_passwords = run_pipal(cewl_file if cewl_file else seclists_file) if cewl_file or seclists_file else []
+
+    words = collect_words_from_sources(cewl_file, seclists_file, pipal_passwords)
+
+    additional_base_words_input = input("Enter additional base words, separated by commas: ").strip()
+    additional_base_words = [word.strip().lower() for word in additional_base_words_input.split(",") if word.strip()]
+    words.extend(additional_base_words)
+
+    pattern_file = input("Enter the name of the pattern file (or press Enter to skip): ").strip()
+    patterns = list(read_patterns(pattern_file)) if pattern_file else []
+
+    logging.info("\nSummary of files used for word combination:")
+    logging.info(f"CeWL file used: {cewl_file if cewl_file else 'None'}")
+    logging.info(f"SecLists file used: {seclists_file if seclists_file else 'None'}")
+    logging.info(f"Pipal top 10 passwords: {', '.join(pipal_passwords) if pipal_passwords else 'None'}")
+    logging.info(f"Additional base words: {', '.join(additional_base_words) if additional_base_words else 'None'}")
+
+    proceed = get_yes_no_input("Do you want to proceed with generating password combinations? (yes/no): ")
+    if proceed:
         output_file = input("Enter the output file path: ").strip()
-        with open(output_file, 'w') as f:
-            for variant in variants:
-                f.write(variant + '\n')
-
-        print(f"Generated {len(variants)} password combinations. Saved to {output_file}.")
+        generate_and_save_variants(words, patterns, output_file)
     else:
-        print("Exiting without generating combinations.")
+        logging.info("Exiting without generating combinations.")
+
 
 if __name__ == "__main__":
     main()
